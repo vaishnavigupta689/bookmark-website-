@@ -24,7 +24,7 @@ This application allows users to store, manage, and access bookmarks efficiently
 
 ---
 
-## 🛠️ Tech Stack (Detailed)
+## 🛠️ Tech Stack 
 
 ### 🧱 Frontend Structure
 - **HTML5**
@@ -60,7 +60,7 @@ This application allows users to store, manage, and access bookmarks efficiently
 
 ---
 
-## 📂 Project Structure
+
 
 
 
