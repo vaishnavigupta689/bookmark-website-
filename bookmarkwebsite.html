@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>My Bookmarks</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial;line-height:1.4}
+    body{max-width:900px;margin:28px auto;padding:18px;border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,0.06)}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    h1{font-size:1.35rem;margin:0}
+    p.lead{margin:6px 0 18px;color:#444}
+    form{display:grid;grid-template-columns:1fr 340px 120px;gap:10px;align-items:center;margin-bottom:14px}
+    input[type="text"]{padding:10px;border-radius:8px;border:1px solid #ccc;font-size:0.95rem}
+    button{padding:10px 12px;border-radius:8px;border:0;background:#1167b1;color:#fff;font-weight:600;cursor:pointer}
+    button.secondary{background:#777}
+    #list{margin-top:10px;display:grid;gap:8px}
+    .item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:8px;border:1px solid #eee;background:#fafafa}
+    .item a{flex:1;word-break:break-all;text-decoration:none;color:#0b5db6}
+    .item small{display:block;color:#666;font-size:0.84rem}
+    .controls{display:flex;gap:8px}
+    .empty{color:#777;padding:18px;text-align:center;border-radius:8px;background:#fff}
+    footer{margin-top:18px;color:#666;font-size:0.88rem;text-align:center}
+    @media (max-width:720px){
+      form{grid-template-columns:1fr; }
+      button{width:100%;}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bookmarks</h1>
+  </header>
+
+  <p class="lead">Add and store links using standard <code>&lt;a href="..."&gt;</code> links. Data is saved in your browser (localStorage).</p>
+
+  <form id="addForm" onsubmit="return false;">
+    <input id="title" type="text" placeholder="Site title (e.g. MDN Web Docs)" required />
+    <input id="url" type="text" placeholder="URL (e.g. https://developer.mozilla.org)" required />
+    <button id="addBtn" type="submit">Add bookmark</button>
+    <button id="clearBtn" type="button" class="secondary" title="Clear all bookmarks">Clear all</button>
+  </form>
+
+  <div id="list" aria-live="polite"></div>
+
+  <footer>
+    Tip: Links open in a new tab. This page uses <code>localStorage</code> so bookmarks persist on the same browser.
+  </footer>
+
+  <script>
+    const STORAGE_KEY = 'myBookmarks_v1';
+    const titleInput = document.getElementById('title');
+    const urlInput = document.getElementById('url');
+    const addBtn = document.getElementById('addBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const list = document.getElementById('list');
+
+    function safeTrim(s){ return (s || '').toString().trim(); }
+
+    function ensureProtocol(u){
+      // If url doesn't start with http:// or https:// add https://
+      if(!/^https?:\/\//i.test(u)) return 'https://' + u;
+      return u;
+    }
+
+    function loadBookmarks(){
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return null;
+      try{ return JSON.parse(raw) } catch(e){ return null }
+    }
+
+    function saveBookmarks(arr){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+
+    function renderBookmarks(){
+      const arr = loadBookmarks() || defaultBookmarks();
+      list.innerHTML = '';
+      if(arr.length === 0){
+        list.innerHTML = '<div class="empty">No bookmarks yet. Add one above!</div>';
+        return;
+      }
+      arr.forEach((b, idx) => {
+        const el = document.createElement('div');
+        el.className = 'item';
+        const anchor = document.createElement('a');
+        anchor.href = b.url;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.innerHTML = `<strong>${escapeHtml(b.title || b.url)}</strong><br><small>${escapeHtml(b.url)}</small>`;
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.textContent = 'Delete';
+        del.title = 'Delete this bookmark';
+        del.className = 'secondary';
+        del.onclick = () => {
+          removeBookmark(idx);
+        };
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.textContent = 'Open';
+        openBtn.onclick = () => window.open(b.url, '_blank', 'noopener');
+        controls.appendChild(openBtn);
+        controls.appendChild(del);
+
+        el.appendChild(anchor);
+        el.appendChild(controls);
+        list.appendChild(el);
+      });
+    }
+
+    function defaultBookmarks(){
+      // initial examples if nothing stored
+      const examples = [
+        {title: 'MDN Web Docs', url: 'https://developer.mozilla.org'},
+        {title: 'Stack Overflow', url: 'https://stackoverflow.com'},
+        {title: 'Google', url: 'https://www.google.com'}
+      ];
+      // do not auto-save these — only show if storage empty
+      return examples;
+    }
+
+    function addBookmark(){
+      const title = safeTrim(titleInput.value);
+      let url = safeTrim(urlInput.value);
+      if(!title || !url){
+        alert('Please provide both title and URL.');
+        return;
+      }
+      url = ensureProtocol(url);
+      // Basic URL validation:
+      try{
+        new URL(url);
+      } catch(e){
+        alert('Invalid URL. Check format (e.g. https://example.com).');
+        return;
+      }
+
+      let arr = loadBookmarks();
+      if(!arr) arr = [];
+      arr.unshift({title, url});
+      saveBookmarks(arr);
+      titleInput.value = '';
+      urlInput.value = '';
+      titleInput.focus();
+      renderBookmarks();
+    }
+
+    function removeBookmark(index){
+      let arr = loadBookmarks() || [];
+      if(index < 0 || index >= arr.length) return;
+      arr.splice(index, 1);
+      saveBookmarks(arr);
+      renderBookmarks();
+    }
+
+    clearBtn.addEventListener('click', () => {
+      if(!confirm('Delete all saved bookmarks?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderBookmarks();
+    });
+
+    addBtn.addEventListener('click', addBookmark);
+    // also submit on Enter when in url or title
+    document.getElementById('addForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      addBookmark();
+    });
+
+    function escapeHtml(s){
+      return s.replace(/[&<>"']/g, function(m){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m];
+      });
+    }
+
+    // load bookmarks from storage on start; if none, show examples but don't overwrite
+    (function init(){
+      // If no stored bookmarks, we show examples but don't save them - user must add to persist
+      renderBookmarks();
+      // If there are stored bookmarks and the list is the defaults, we should render stored instead:
+      if(loadBookmarks() && loadBookmarks().length>0) renderBookmarks();
+    })();
+  </script>
+</body>
+</html>
